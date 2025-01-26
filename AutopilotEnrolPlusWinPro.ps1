@@ -7,51 +7,42 @@ Write-Host "Checking Windows version..." -ForegroundColor Yellow
 if ($winver -like "*Windows 11*") {
     Write-Host "Windows version detected: $winver" -ForegroundColor Green
 } elseif ($winver -like "*Windows 10*") {
-    Write-Host "WARNING: Windows 10 detected. Windows 11 Pro upgrade is recommended." -ForegroundColor Red
-    $response = Read-Host "Would you like to proceed with the upgrade to Windows 11 Pro? (Y/N)"
-    if ($response -ne "Y") {
-        Write-Host "Exiting script as per user request." -ForegroundColor Cyan
-        exit
-    }
+    Write-Host "Windows 10 detected. Continuing with the process..." -ForegroundColor Yellow
 } else {
     Write-Host "ERROR: Unsupported version of Windows. Exiting..." -ForegroundColor Red
     exit
 }
 
-# 2. Upgrade to Windows Pro
-Write-Host "Preparing system for Windows Pro upgrade..." -ForegroundColor Yellow
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /upk"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /cpky"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /ckms"
+# 2. Check for Home Edition and Force Upgrade to Pro
+if ($winver -like "*Home*") {
+    Write-Host "Windows Home detected. Forcing upgrade to Windows Pro..." -ForegroundColor Red
 
-Write-Host "Checking if your edition is upgradable to Pro..." -ForegroundColor Yellow
-$dismOutput = dism /online /Get-TargetEditions
-if ($dismOutput -notmatch "Professional") {
-    Write-Host "ERROR: Your edition does not support an upgrade to Pro." -ForegroundColor Red
+    # Clear Activation Data
+    Write-Host "Clearing activation data..." -ForegroundColor Yellow
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /upk"
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /cpky"
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /ckms"
+
+    # Force the Upgrade to Windows Pro
+    Write-Host "Starting upgrade to Windows Pro. This may take some time..." -ForegroundColor Yellow
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c sc config LicenseManager start= auto & net start LicenseManager"
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c sc config wuauserv start= auto & net start wuauserv"
+    Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c changepk.exe /productkey VK7JG-NPHTM-C97JM-9MPGT-3V66T"
+
+    Write-Host "Rebooting system to finalize upgrade. Please wait during updates..." -ForegroundColor Cyan
+    shutdown /r /t 0
     exit
-} else {
-    Write-Host "Your edition supports an upgrade to Pro." -ForegroundColor Green
 }
 
-Write-Host "Upgrading to Windows Pro..." -ForegroundColor Yellow
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c sc config LicenseManager start= auto & net start LicenseManager"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c sc config wuauserv start= auto & net start wuauserv"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c changepk.exe /productkey VK7JG-NPHTM-C97JM-9MPGT-3V66T"
-
-Write-Host "Rebooting system to finalize upgrade. Please wait during updates..." -ForegroundColor Cyan
-shutdown /r /t 0
-
-# Wait for reboot and resume script execution
-Start-Sleep -Seconds 30
-
+# 3. Activate Windows Pro
 Write-Host "Activating Windows Pro..." -ForegroundColor Yellow
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr /ipk W269N-WFGWX-YVC9B-4J6C9-T83GX"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr /skms kms8.msguides.com"
-Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr /ato"
+Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /ipk W269N-WFGWX-YVC9B-4J6C9-T83GX"
+Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /skms kms8.msguides.com"
+Start-Process -NoNewWindow -Wait -FilePath "cmd.exe" -ArgumentList "/c slmgr.vbs /ato"
 
 Write-Host "Windows Pro has been successfully activated!" -ForegroundColor Green
 
-# 3. Prepare for Autopilot Enrollment
+# 4. Prepare for Autopilot Enrollment
 Write-Host "Preparing for Autopilot enrollment..." -ForegroundColor Yellow
 
 # Install Get-WindowsAutopilotInfo if not installed
@@ -73,6 +64,6 @@ Write-Host "4. Ensure 'Enabled = Yes'. If not, click 'Enable'."
 Write-Host "Press Enter to continue once manual steps are complete." -ForegroundColor Magenta
 Read-Host
 
-# 4. Restart the Laptop
+# 5. Restart the Laptop
 Write-Host "Restarting the laptop now..." -ForegroundColor Green
 shutdown /r /t 0
